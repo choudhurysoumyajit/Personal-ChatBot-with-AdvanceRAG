@@ -9,3 +9,4 @@ langchain_groq
 python-dotenv
 langchain-chroma
 langchain-huggingface
+sentence_transformers==5.2.0
