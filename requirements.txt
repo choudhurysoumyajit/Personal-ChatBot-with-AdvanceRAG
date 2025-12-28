@@ -1,0 +1,11 @@
+chromadb== 0.6.1
+protobuf==3.20.*
+streamlit==1.36.0
+pypdf==4.2.0
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-openai
+langchain_groq
+python-dotenv
+langchain-chroma
+langchain-huggingface
