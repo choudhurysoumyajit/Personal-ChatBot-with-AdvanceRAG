@@ -4,7 +4,6 @@ import tempfile
 from langchain_groq import ChatGroq
 #from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-#from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -31,8 +30,8 @@ embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 VECTOR_STORE_PATH = "vector_store"
 HISTORY_FILE = os.path.join(VECTOR_STORE_PATH, "conversation_history.json")
 
-def vector_db():
-    return Chroma(embedding_function=embeddings, persist_directory=VECTOR_STORE_PATH)
+#def vector_db():
+    #return Chroma(embedding_function=embeddings, persist_directory=VECTOR_STORE_PATH)
 
 load_dotenv()
 
@@ -67,7 +66,7 @@ def process_files(files, chunk_size=1000, chunk_overlap=100):
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = splitter.split_documents(docs)
 
-    vectordb = vector_db()
+    #vectordb = vector_db()
 
 # ⚠️ This deletes ALL vectors in the default collection
 
