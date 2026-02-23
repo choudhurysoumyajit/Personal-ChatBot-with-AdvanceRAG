@@ -4,6 +4,7 @@ import tempfile
 from langchain_groq import ChatGroq
 #from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -12,14 +13,6 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 import shutil
-from groq import Groq
-from pathlib import Path
-#from elevenlabs.client import ElevenLabs
-#from elevenlabs.play import play
-#from elevenlabs import save
-from gtts import gTTS
-
-
 
 os.environ["CHROMA_TELEMETRY"] = "false"
 # Initialize sentence transformer embeddings (free)
@@ -30,8 +23,8 @@ embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 VECTOR_STORE_PATH = "vector_store"
 HISTORY_FILE = os.path.join(VECTOR_STORE_PATH, "conversation_history.json")
 
-#def vector_db():
-    #return Chroma(embedding_function=embeddings, persist_directory=VECTOR_STORE_PATH)
+def vector_db():
+    return Chroma(embedding_function=embeddings, persist_directory=VECTOR_STORE_PATH)
 
 load_dotenv()
 
@@ -66,7 +59,7 @@ def process_files(files, chunk_size=1000, chunk_overlap=100):
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = splitter.split_documents(docs)
 
-    #vectordb = vector_db()
+    vectordb = vector_db()
 
 # ⚠️ This deletes ALL vectors in the default collection
 
@@ -80,21 +73,64 @@ def process_files(files, chunk_size=1000, chunk_overlap=100):
 
 def ask_question(query, k=3, file_flag=False):
 
-        llm = ChatGroq(
-        model_name="llama-3.3-70b-versatile",
-        temperature=0.7
-        )
+    llm = ChatGroq(
+    model_name="llama-3.3-70b-versatile",
+    temperature=0.7
+    )
+
+    if file_flag:
+
+        vectordb = vector_db()
+        collection = vectordb._collection  
+        data = collection.get()
+        ids = data["ids"]
+
+        for i, _id in enumerate(ids, 1):
+            print(f"{i}: {_id}")
 
         prompt_template = """
-        As a highly knowledgeable chat assistant and a proficient english tutor, your role is to accurately interpret queries and 
+        As a highly knowledgeable chat assistant, your role is to accurately interpret queries, respond to greetings or generic conversations and 
+        provide responses by strictly using the context. Do not hallucinate. Follow these directives to ensure optimal user interactions:
+        1. Precision in Answers: If any context is provided, Respond solely with information directly relevant to the user's query from the database. 
+        2. Avoiding Duplication: Ensure no response is repeated within the same interaction, maintaining uniqueness and 
+            relevance to each user query.
+        3. Streamlined Communication: Eliminate any unnecessary comments or closing remarks from responses. Focus on
+            delivering clear, concise, and direct answers.
+        4. Avoid Non-essential Sign-offs: Do not include any sign-offs like "Best regards" or "FashionBot" in responses.
+        5. One-time Use Phrases: Avoid using the same phrases multiple times within the same response. Each 
+            sentence should be unique and contribute to the overall message without redundancy.
+
+        Query:
+        {context}
+
+        Question: {question}
+
+        Answer:
+        """
+        custom_prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+        print(file_flag)
+        retriever = vectordb.as_retriever(search_kwargs={"k": k})
+
+        qa = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, chain_type="stuff", chain_type_kwargs={"prompt": custom_prompt}, return_source_documents=True,)
+
+        result = qa.invoke({"query": query})
+
+        response_text=result["result"]
+        sources = result["source_documents"]
+
+        print("\nAnswer:\n", response_text)
+        print("\nContext used:")
+        for i, doc in enumerate(sources, 1):
+            print(f"\n--- Chunk {i} ---")
+            print(doc.page_content)
+            print(result["result"])
+
+    else:
+
+        prompt_template = """
+        As a highly knowledgeable chat assistant, your role is to accurately interpret queries and 
         provide appropriate responses.
 
-        Listen the statement provided, understand the context. Find out the grammatical mistakes and help user to rectify that 
-        or provide ideas on how to improve the same sentence . Be creative and Continue the discussion by proactively asking more engaging questions untill user is not willing to continue.  
-
-        Make the conversation interesting and humanlike.   
-
-        Provide conscise answers within 100 word limit. 
         Question: {question}
         """
         custom_prompt = PromptTemplate(template=prompt_template, input_variables=["question"])
@@ -109,44 +145,7 @@ def ask_question(query, k=3, file_flag=False):
         print(file_flag)
         response_text = result.content
 
-        return response_text
+    return response_text
 
-def audio_transcript(audio_file):
-    # Initialize the Groq client
-    client = Groq() 
-    if audio_file:
-    # Display audio player
-        transcription = client.audio.transcriptions.create(
-        model="whisper-large-v3-turbo", 
-        file=Path(audio_file), 
-        #response_format="text",
-        prompt="provide an accurate transcription of the audio file using ponctuations and capitalization as well."
-        )
-        return transcription.text
-        
-def text_to_speech(input_text):
-    client = ElevenLabs(
-    api_key=os.getenv('ELELABS_API_KEY') 
-)
-    audio = client.text_to_speech.convert(
-    text=input_text,
-    voice_id="JBFqnCBsd6RMkjVDRZzb",
-    model_id="eleven_multilingual_v2",
-    output_format="mp3_44100_128",
-)
-    #play(audio)
-    #save(audio, "output.mp3")
+    
 
-def text_to_speech2(input_text):
-    # Language in which you want to convert
-    language = 'en'
-
-    # Passing the text and language to the engine, 
-    # here we have marked slow=False. Which tells 
-    # the module that the converted audio should 
-    # have a high speed
-    myobj = gTTS(text=input_text, lang=language, slow=False)
-
-    # Saving the converted audio in a mp3 file named
-    # welcome 
-    myobj.save("t2s.mp3")
