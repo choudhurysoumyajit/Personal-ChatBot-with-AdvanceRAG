@@ -15,4 +15,4 @@ groq
 Watchdog
 elevenlabs
 gtts
-langchain_chroma
+langchain-chroma
